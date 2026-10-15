@@ -12,6 +12,8 @@ It covers what [Agents](https://github.com/1-Bart-1/Agents) uses, both the comma
 
 ## Running it
 
+Gitea 1.27 or newer is required; CI tests 1.27 and the latest release. Earlier versions lack the API for Actions runs and for resolving review comments.
+
 ```sh
 npm ci
 GITEA_URL=https://gitea.example.com PORT=8080 npm start

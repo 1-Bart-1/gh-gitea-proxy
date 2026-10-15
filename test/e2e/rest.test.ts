@@ -11,6 +11,15 @@ let issue: number;
 let pull: number;
 let sha: string;
 
+/** Whether `check` comes true within ten seconds. */
+async function eventually(check: () => boolean): Promise<boolean> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (check()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
+}
+
 /** jq output of one value per line, parsed. */
 const lines = (out: string): any[] => out.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
 
@@ -146,14 +155,18 @@ describe("gh api REST", () => {
       alice.token);
     const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 19) + "Z";
 
-    const items = lines(h.ok(["api", "/issues", "-X", "GET", "-f", "filter=mentioned", "-f", "state=all",
-      "-f", "per_page=100", "-f", `since=${since}`, "--paginate", "--jq", ".[] | {repo: .repository.full_name, number} | @json"]));
-    assert.ok(items.some((item) => item.repo === repo && item.number === mentioned));
+    // Gitea indexes mentions in the background, so the search finds one a moment later.
+    const found = await eventually(() => lines(h.ok(["api", "/issues", "-X", "GET", "-f", "filter=mentioned",
+      "-f", "state=all", "-f", "per_page=100", "-f", `since=${since}`, "--paginate", "--jq",
+      ".[] | {repo: .repository.full_name, number} | @json"]))
+      .some((item) => item.repo === repo && item.number === mentioned));
+    assert.ok(found);
 
-    const notices = lines(h.ok(["api", "/notifications", "-X", "GET", "-f", "all=true", "-f", `since=${since}`,
+    const notices = () => lines(h.ok(["api", "/notifications", "-X", "GET", "-f", "all=true", "-f", `since=${since}`,
       "-f", "per_page=100", "--paginate", "--jq", `.[] | select(.subject.type == "Issue" or .subject.type == "PullRequest" or .subject.type == "Commit") | {repo: .repository.full_name, number: (if .subject.type == "Commit" then 0 else .subject.url | split("/") | last | tonumber end), kind: ({PullRequest: "pr", Issue: "issue", Commit: "commit"}[.subject.type]), reason: .reason, updated: (.updated_at // "")} | @json`]));
-    const notice = notices.find((entry) => entry.repo === repo && entry.number === mentioned);
-    assert.ok(notice, JSON.stringify(notices));
+    await eventually(() => notices().some((entry) => entry.repo === repo && entry.number === mentioned));
+    const notice = notices().find((entry) => entry.repo === repo && entry.number === mentioned);
+    assert.ok(notice, JSON.stringify(notices()));
     assert.equal(notice.reason, "mention");
     assert.equal(notice.kind, "issue");
 

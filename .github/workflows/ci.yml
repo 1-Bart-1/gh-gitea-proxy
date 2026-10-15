@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gitea: ["docker.io/gitea/gitea:latest", "docker.io/gitea/gitea:1.24"]
+        gitea: ["docker.io/gitea/gitea:latest", "docker.io/gitea/gitea:1.27"]
     env:
       GH_VERSION: 2.102.0
       # gh matches a clone's remote to GH_HOST by hostname alone, which needs port 443.
