@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  e2e:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        gitea: ["docker.io/gitea/gitea:latest", "docker.io/gitea/gitea:1.24"]
+    env:
+      GH_VERSION: 2.102.0
+      # gh matches a clone's remote to GH_HOST by hostname alone, which needs port 443.
+      PROXY_PORT: 443
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Install the gh the tests are pinned to
+        run: |
+          curl -fsSL "https://github.com/cli/cli/releases/download/v$GH_VERSION/gh_${GH_VERSION}_linux_amd64.tar.gz" |
+            tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gh_${GH_VERSION}_linux_amd64/bin" >> "$GITHUB_PATH"
+      - run: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=443
+      - name: Start Gitea and an Actions runner
+        run: GITEA_IMAGE=${{ matrix.gitea }} GITEA_RUNNER=1 test/e2e/gitea.sh | sed 's/^export //' >> "$GITHUB_ENV"
+      - run: gh --version
+      - run: npm run test:e2e

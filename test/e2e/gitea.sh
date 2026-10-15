@@ -43,4 +43,5 @@ if [[ -n ${GITEA_RUNNER:-} ]]; then
   echo "export E2E_RUNNER=1"
 fi
 
-echo "export GITEA_URL=http://localhost:$port GITEA_TOKEN=$token"
+echo "export GITEA_URL=http://localhost:$port"
+echo "export GITEA_TOKEN=$token"

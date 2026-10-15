@@ -7,7 +7,7 @@ import type {
   GReviewComment, GStatus, GUser,
 } from "../types.ts";
 
-export const REACTIONS = ["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"];
+const REACTIONS = ["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"];
 
 export function user(gitea: GUser | null | undefined) {
   if (!gitea) return null;
@@ -73,7 +73,7 @@ const branch = (gitea: GPull["head"]) => ({
 export function pull(origin: string, gitea: GPull) {
   const full = repoOf(gitea);
   return {
-    ...issue(origin, { ...gitea, comments: gitea.comments } as unknown as GIssue),
+    ...issue(origin, gitea as unknown as GIssue),
     title: titleOf(gitea),
     url: `${origin}/api/v3/repos/${full}/pulls/${gitea.number}`,
     draft: gitea.draft, merged: gitea.merged, merged_at: gitea.merged_at,
@@ -87,7 +87,7 @@ export function pull(origin: string, gitea: GPull) {
 }
 
 /** The draft marker Gitea reads off a pull request's title. */
-export const DRAFT_PREFIX = "WIP: ";
+const DRAFT_PREFIX = "WIP: ";
 
 const DRAFT_MARKERS = /^\s*(WIP:|\[WIP\])\s*/i;
 

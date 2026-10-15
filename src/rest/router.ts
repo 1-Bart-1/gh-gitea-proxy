@@ -76,10 +76,6 @@ export function match(method: string, path: string):
   return undefined;
 }
 
-/** Every registered route, as `METHOD template`, for the README checklist test. */
-export const registered = (): string[] =>
-  routes.map((entry) => `${entry.method} ${entry.pattern.source}`);
-
 /**
  * One GitHub-style page of `items`, with the `Link` header `gh --paginate`
  * follows to the next one.
