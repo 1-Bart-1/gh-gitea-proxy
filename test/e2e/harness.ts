@@ -20,7 +20,7 @@ export interface Result {
 
 /** One call to Gitea's own API as the admin, for setting up and checking state. */
 export async function admin<T = any>(method: string, path: string, body?: unknown,
-  token = ADMIN_TOKEN): Promise<T> {
+  token: string = ADMIN_TOKEN): Promise<T> {
   const response = await fetch(`${GITEA_URL}/api/v1/${path}`, {
     method,
     headers: { authorization: `token ${token}`, "content-type": "application/json" },
@@ -126,6 +126,28 @@ async function start(): Promise<Harness> {
 
 /** The trailing number of the URL a `gh ... create` prints, as the Agents box reads it. */
 export const numberIn = (printed: string): number => Number(/(\d+)\s*$/.exec(printed.trim())?.[1]);
+
+const users = new Map<string, Promise<{ login: string; token: string }>>();
+
+/** A second account with a token of its own, made once per test process. */
+export function otherUser(name: string): Promise<{ login: string; token: string }> {
+  if (!users.has(name)) users.set(name, makeUser(`${name}${process.pid}`));
+  return users.get(name)!;
+}
+
+async function makeUser(login: string) {
+  const password = "other-password-1";
+  await admin("POST", "admin/users", {
+    username: login, email: `${login}@example.com`, password, must_change_password: false,
+  });
+  const response = await fetch(`${GITEA_URL}/api/v1/users/${login}/tokens`, {
+    method: "POST",
+    headers: { authorization: `Basic ${Buffer.from(`${login}:${password}`).toString("base64")}`,
+      "content-type": "application/json" },
+    body: JSON.stringify({ name: "e2e", scopes: ["all"] }),
+  });
+  return { login, token: ((await response.json()) as { sha1: string }).sha1 };
+}
 
 let counter = 0;
 
