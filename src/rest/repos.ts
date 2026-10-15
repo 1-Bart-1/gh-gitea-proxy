@@ -1,4 +1,5 @@
-import type { GCombinedStatus, GCommit, GLabel, GRelease, GRepo } from "../types.ts";
+import { combined, statusesOn } from "../checks.ts";
+import type { GCommit, GLabel, GRelease, GRepo } from "../types.ts";
 import { paged, reply, RestError, route } from "./router.ts";
 import * as shape from "./shape.ts";
 
@@ -76,11 +77,12 @@ route("POST", `${R}/git/refs`, async ({ gitea, params, body }) => {
   return reply({ status: 201, body: { ref, object: { sha: body.sha, type: "commit" } } });
 });
 
+/** The statuses something other than Gitea Actions posted, whose jobs are check runs. */
 route("GET", `${R}/commits/:sha/status`, async ({ gitea, params }) => {
-  const combined = await gitea.get<GCombinedStatus>(`repos/${repoName(params)}/commits/${params.sha}/status`);
+  const statuses = (await statusesOn(gitea, repoName(params), params.sha)).map(shape.status);
   return {
-    state: combined.state || "pending", sha: combined.sha, total_count: combined.total_count,
-    statuses: (combined.statuses ?? []).map(shape.status),
+    state: statuses.length ? combined(statuses.map((status) => status.state)) : "pending",
+    sha: params.sha, total_count: statuses.length, statuses,
   };
 });
 

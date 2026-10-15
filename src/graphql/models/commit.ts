@@ -1,6 +1,7 @@
-import type { GCombinedStatus, GCommit, GPull, GRelease, GStatus } from "../../types.ts";
+import { combined, detailsUrl, jobsOn, jobState, statusesOn } from "../../checks.ts";
+import type { GActionJob, GCommit, GPull, GRelease, GStatus } from "../../types.ts";
 import { connection, type Page } from "../connection.ts";
-import type { Context } from "../context.ts";
+import { type Context, repoData } from "../context.ts";
 import { nodeId } from "../ids.ts";
 import { none, userOf } from "./common.ts";
 import { PullRequest } from "./issue.ts";
@@ -175,19 +176,26 @@ export class StatusCheckRollup {
   readonly context: Context;
   readonly repo: string;
   readonly sha: string;
-  readonly combined: GCombinedStatus;
+  readonly runs: CheckRun[];
+  readonly statuses: StatusContext[];
 
-  private constructor(context: Context, repo: string, sha: string, combined: GCombinedStatus) {
+  private constructor(context: Context, repo: string, sha: string, runs: CheckRun[],
+    statuses: StatusContext[]) {
     this.context = context;
     this.repo = repo;
     this.sha = sha;
-    this.combined = combined;
+    this.runs = runs;
+    this.statuses = statuses;
   }
 
-  /** The rollup of a commit's statuses, and null for a commit that has none, as GitHub does. */
+  /** What ran on a commit, and null for a commit nothing ran on, as GitHub answers. */
   static async load(context: Context, repo: string, sha: string) {
-    const combined = await context.gitea.get<GCombinedStatus>(`repos/${repo}/commits/${sha}/status`);
-    return combined.statuses?.length ? new StatusCheckRollup(context, repo, sha, combined) : null;
+    const [data, jobs, statuses] = await Promise.all([repoData(context, repo),
+      jobsOn(context.gitea, repo, sha), statusesOn(context.gitea, repo, sha)]);
+    if (!jobs.length && !statuses.length) return null;
+    return new StatusCheckRollup(context, repo, sha,
+      jobs.map((job) => new CheckRun(repo, data.html_url, job)),
+      statuses.map((status) => new StatusContext(repo, status)));
   }
 
   get id() {
@@ -195,7 +203,9 @@ export class StatusCheckRollup {
   }
 
   get state() {
-    return STATES[this.combined.state] ?? "PENDING";
+    return combined([...this.runs.map((run) => jobState(run.data)),
+      ...this.statuses.map((status) => status.data.status === "warning" ? "success" : status.data.status)])
+      .toUpperCase();
   }
 
   get commit() {
@@ -203,14 +213,85 @@ export class StatusCheckRollup {
   }
 
   contexts(args: Page) {
-    const nodes = (this.combined.statuses ?? []).map((status) => new StatusContext(this.repo, status));
+    const counts = (nodes: { state: string }[]) => Object.entries(Object.groupBy(nodes, (node) => node.state))
+      .map(([state, list]) => ({ state, count: list?.length ?? 0 }));
     return {
-      ...connection(nodes, args),
-      checkRunCount: 0, statusContextCount: nodes.length,
-      checkRunCountsByState: [],
-      statusContextCountsByState: Object.entries(Object.groupBy(nodes, (node) => node.state))
-        .map(([state, list]) => ({ state, count: list?.length ?? 0 })),
+      ...connection<CheckRun | StatusContext>([...this.runs, ...this.statuses], args),
+      checkRunCount: this.runs.length, statusContextCount: this.statuses.length,
+      checkRunCountsByState: counts(this.runs.map((run) => ({ state: run.conclusion ?? run.status }))),
+      statusContextCountsByState: counts(this.statuses),
     };
+  }
+}
+
+/** A Gitea Actions job. */
+export class CheckRun {
+  readonly __typename = "CheckRun";
+
+  readonly repo: string;
+  readonly repoHtml: string;
+  readonly data: GActionJob;
+
+  constructor(repo: string, repoHtml: string, data: GActionJob) {
+    this.repo = repo;
+    this.repoHtml = repoHtml;
+    this.data = data;
+  }
+
+  get id() {
+    return nodeId("CheckRun", this.repo, this.data.id);
+  }
+
+  get databaseId() {
+    return this.data.id;
+  }
+
+  get name() {
+    return this.data.name;
+  }
+
+  get status() {
+    return this.data.status.toUpperCase();
+  }
+
+  get conclusion() {
+    return this.data.status === "completed" && this.data.conclusion ? this.data.conclusion.toUpperCase() : null;
+  }
+
+  get detailsUrl() {
+    return detailsUrl(this.repoHtml, this.data);
+  }
+
+  get url() {
+    return this.data.html_url;
+  }
+
+  get permalink() {
+    return this.data.html_url;
+  }
+
+  get startedAt() {
+    return this.data.started_at ?? null;
+  }
+
+  get completedAt() {
+    return this.data.completed_at ?? null;
+  }
+
+  get title() {
+    return null;
+  }
+
+  get summary() {
+    return null;
+  }
+
+  isRequired() {
+    return false;
+  }
+
+  get checkSuite() {
+    return { workflowRun: { workflow: { name: "" }, event: "push", runNumber: this.data.run_id } };
   }
 }
 

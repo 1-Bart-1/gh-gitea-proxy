@@ -1,29 +1,17 @@
-import type { GActionJob, GActionRun, GRepo } from "../types.ts";
+import { detailsUrl, jobsOn } from "../checks.ts";
+import type { GActionJob, GRepo } from "../types.ts";
 import { paged, reply, route } from "./router.ts";
 
 const R = "repos/:owner/:repo";
 const repoName = (params: Record<string, string>) => `${params.owner}/${params.repo}`;
 
-/**
- * A Gitea Actions job as a GitHub check run. The details URL takes GitHub's
- * `/actions/runs/<run>/job/<job>` form with the API's IDs, so a client that
- * reads them out of it can ask for the job's log and rerun its run.
- */
-export const checkRun = (repo: GRepo, job: GActionJob) => ({
+/** A Gitea Actions job as a GitHub check run. */
+const checkRun = (repo: GRepo, job: GActionJob) => ({
   id: job.id, name: job.name, head_sha: job.head_sha, status: job.status,
   conclusion: job.conclusion || null, started_at: job.started_at ?? null,
   completed_at: job.completed_at ?? null, html_url: job.html_url,
-  details_url: `${repo.html_url}/actions/runs/${job.run_id}/job/${job.id}`,
+  details_url: detailsUrl(repo.html_url, job),
 });
-
-/** Every Actions job that ran on `sha`. */
-export async function jobsOn(gitea: import("../gitea.ts").Gitea, repo: string, sha: string) {
-  const runs = await gitea.get<{ workflow_runs: GActionRun[] | null }>(`repos/${repo}/actions/runs`,
-    { head_sha: sha, limit: 50 });
-  const lists = await Promise.all((runs.workflow_runs ?? []).map((run) =>
-    gitea.get<{ jobs: GActionJob[] | null }>(`repos/${repo}/actions/runs/${run.id}/jobs`)));
-  return lists.flatMap((list) => list.jobs ?? []);
-}
 
 route("GET", `${R}/commits/:sha/check-runs`, async (request) => {
   const repo = repoName(request.params);
