@@ -98,9 +98,13 @@ export class Commit {
     return connection(listed.map((data) => new Commit(this.context, this.repo, data.sha, data)), args);
   }
 
+  /** The pull request that merged this commit, or else the open ones it heads. */
   async associatedPullRequests(args: Page) {
-    const found = await this.context.gitea.find<GPull>(`repos/${this.repo}/commits/${await this.oid()}/pull`);
-    return connection(found ? [new PullRequest(this.context, this.repo, found)] : [], args);
+    const oid = await this.oid();
+    const merged = await this.context.gitea.find<GPull>(`repos/${this.repo}/commits/${oid}/pull`);
+    const pulls = merged ? [merged] : (await this.context.gitea.all<GPull>(`repos/${this.repo}/pulls`,
+      { state: "open" })).filter((pull) => pull.head.sha === oid);
+    return connection(pulls.map((pull) => new PullRequest(this.context, this.repo, pull)), args);
   }
 
   /** The file at `path` in this commit's tree, as a tree entry holding its blob. */
@@ -297,6 +301,10 @@ export class Release {
 
   get isPrerelease() {
     return this.data.prerelease;
+  }
+
+  get immutable() {
+    return false;
   }
 
   async isLatest() {

@@ -11,8 +11,8 @@ import {
   type GraphQLFieldResolver, type GraphQLSchema, type GraphQLTypeResolver,
 } from "graphql";
 
-/** The SDL the package ships beside its entry point, which its exports map leaves out. */
-const SDL = fileURLToPath(new URL("schema.graphql", import.meta.resolve("@octokit/graphql-schema")));
+/** GitHub's published schema, refreshed by `bin/update-schema`. */
+const SDL = fileURLToPath(new URL("../../schema/github.graphql", import.meta.url));
 
 /** The schema's own definitions with what graphql-js refuses to execute removed. */
 function cleaned(source: string) {

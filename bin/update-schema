@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Replace schema/github.graphql with the schema GitHub publishes for github.com.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+curl -fsSL https://docs.github.com/public/fpt/schema.docs.graphql -o schema/github.graphql
+echo "schema/github.graphql: $(wc -l < schema/github.graphql) lines"

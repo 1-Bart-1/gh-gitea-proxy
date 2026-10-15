@@ -4,8 +4,12 @@
   "description": "Serve the slice of GitHub's REST and GraphQL API that the gh CLI needs, backed by a Gitea instance",
   "license": "AGPL-3.0-only",
   "type": "module",
-  "bin": { "gh-gitea-proxy": "bin/gh-gitea-proxy" },
-  "engines": { "node": ">=24" },
+  "bin": {
+    "gh-gitea-proxy": "bin/gh-gitea-proxy"
+  },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node src/main.ts",
     "test": "node --test test/unit/*.test.ts",
@@ -13,7 +17,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@octokit/graphql-schema": "^15.26.1",
     "graphql": "^17.0.2"
   },
   "devDependencies": {
