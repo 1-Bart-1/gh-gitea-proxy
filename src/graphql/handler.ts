@@ -1,4 +1,7 @@
-import { execute, GraphQLError, parse, validate } from "graphql";
+import {
+  execute, FieldsOnCorrectTypeRule, GraphQLError, OverlappingFieldsCanBeMergedRule, parse,
+  specifiedRules, validate,
+} from "graphql";
 import type { Context } from "./context.ts";
 import { Mutation } from "./models/mutation.ts";
 import { Query } from "./models/root.ts";
@@ -9,6 +12,15 @@ export interface GraphQLRequest {
   variables?: Record<string, unknown>;
   operationName?: string;
 }
+
+/**
+ * GraphQL's validation without the two rules GitHub's own server does not
+ * apply to gh: a field of the same name on two fragments (`state` on `Issue`
+ * and on `PullRequest`), and fields newer than the published schema, which
+ * execution leaves out of the answer and gh reads as null.
+ */
+const RULES = specifiedRules.filter((rule) =>
+  rule !== OverlappingFieldsCanBeMergedRule && rule !== FieldsOnCorrectTypeRule);
 
 /** The root fields of both operation types, which never share a name. */
 function root(context: Context): object {
@@ -31,7 +43,7 @@ export async function answer(context: Context, request: GraphQLRequest) {
   } catch (error) {
     return { errors: [{ message: (error as GraphQLError).message }] };
   }
-  const invalid = validate(schema(), document);
+  const invalid = validate(schema(), document, RULES);
   if (invalid.length) return { errors: invalid.map((error) => ({ message: error.message })) };
   const result = await execute({
     schema: schema(), document, rootValue: root(context), contextValue: context,

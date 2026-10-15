@@ -1,17 +1,18 @@
 /**
  * GitHub's published GraphQL schema, executed against Gitea. Every query gh can
  * send validates; a field answers through the model object of its parent type
- * (`src/graphql/models.ts`), and a field no model implements answers null, or
+ * (`src/graphql/models/`), and a field no model implements answers null, or
  * an error naming it where the schema forbids null.
  */
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import {
   buildASTSchema, GraphQLError, isNonNullType, parse, visit,
   type GraphQLFieldResolver, type GraphQLSchema, type GraphQLTypeResolver,
 } from "graphql";
 
-const require = createRequire(import.meta.url);
+/** The SDL the package ships beside its entry point, which its exports map leaves out. */
+const SDL = fileURLToPath(new URL("schema.graphql", import.meta.resolve("@octokit/graphql-schema")));
 
 /** The schema's own definitions with what graphql-js refuses to execute removed. */
 function cleaned(source: string) {
@@ -37,8 +38,7 @@ function cleaned(source: string) {
 let built: GraphQLSchema | undefined;
 
 export function schema(): GraphQLSchema {
-  built ??= buildASTSchema(cleaned(readFileSync(
-    require.resolve("@octokit/graphql-schema/schema.graphql"), "utf8")), { assumeValidSDL: true });
+  built ??= buildASTSchema(cleaned(readFileSync(SDL, "utf8")), { assumeValidSDL: true });
   return built;
 }
 

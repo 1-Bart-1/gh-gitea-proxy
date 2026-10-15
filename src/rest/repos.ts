@@ -1,5 +1,5 @@
 import type { GCombinedStatus, GCommit, GLabel, GRelease, GRepo } from "../types.ts";
-import { paged, RestError, route } from "./router.ts";
+import { paged, reply, RestError, route } from "./router.ts";
 import * as shape from "./shape.ts";
 
 const R = "repos/:owner/:repo";
@@ -9,7 +9,7 @@ route("GET", R, async ({ gitea, params, origin }) =>
   shape.repo(origin, await gitea.get<GRepo>(`repos/${repoName(params)}`)));
 
 route("POST", `${R}/forks`, async ({ gitea, params, origin }) =>
-  ({ status: 202, body: shape.repo(origin, await gitea.call<GRepo>("POST", `repos/${repoName(params)}/forks`, undefined, {})) }));
+  (reply({ status: 202, body: shape.repo(origin, await gitea.call<GRepo>("POST", `repos/${repoName(params)}/forks`, undefined, {})) })));
 
 route("GET", `${R}/labels`, async (request) => {
   const labels = await request.gitea.all<GLabel>(`repos/${repoName(request.params)}/labels`);
@@ -22,12 +22,12 @@ route("POST", `${R}/labels`, async ({ gitea, params, body }) => {
   const labels = await gitea.all<GLabel>(`repos/${repo}/labels`);
   const existing = labels.find((label) => label.name.toLowerCase() === String(body.name).toLowerCase());
   if (existing) {
-    return { status: 422, body: { message: "Validation Failed",
-      errors: [{ resource: "Label", code: "already_exists", field: "name" }] } };
+    return reply({ status: 422, body: { message: "Validation Failed",
+      errors: [{ resource: "Label", code: "already_exists", field: "name" }] } });
   }
   const created = await gitea.call<GLabel>("POST", `repos/${repo}/labels`, undefined,
     { name: body.name, color: `#${body.color ?? "ededed"}`, description: body.description ?? "" });
-  return { status: 201, body: shape.label(created) };
+  return reply({ status: 201, body: shape.label(created) });
 });
 
 route("PATCH", `${R}/labels/:name`, async ({ gitea, params, body }) => {
@@ -48,7 +48,7 @@ route("GET", `${R}/contents/*path`, async ({ gitea, params, query, headers }) =>
   const ref = query.get("ref") ?? undefined;
   if (String(headers.accept ?? "").includes("raw")) {
     const response = await gitea.raw("GET", `repos/${repo}/raw/${params.path}`, { ref }, undefined, "*/*");
-    return { raw: await response.text() };
+    return reply({ raw: await response.text() });
   }
   return gitea.get(`repos/${repo}/contents/${params.path}`, { ref });
 });
@@ -73,7 +73,7 @@ route("POST", `${R}/git/refs`, async ({ gitea, params, body }) => {
   if (!ref.startsWith("refs/heads/")) throw new RestError(422, "only refs/heads/ can be created");
   await gitea.call("POST", `repos/${repoName(params)}/branches`, undefined,
     { new_branch_name: ref.replace(/^refs\/heads\//, ""), old_ref_name: body.sha });
-  return { status: 201, body: { ref, object: { sha: body.sha, type: "commit" } } };
+  return reply({ status: 201, body: { ref, object: { sha: body.sha, type: "commit" } } });
 });
 
 route("GET", `${R}/commits/:sha/status`, async ({ gitea, params }) => {
@@ -93,7 +93,7 @@ route("GET", `${R}/commits/:sha/statuses`, async (request) => {
 route("POST", `${R}/statuses/:sha`, async ({ gitea, params, body }) => {
   const created = await gitea.call<any>("POST", `repos/${repoName(params)}/statuses/${params.sha}`,
     undefined, body);
-  return { status: 201, body: shape.status(created) };
+  return reply({ status: 201, body: shape.status(created) });
 });
 
 /** Gitea has no commit comments: reads are empty and writes are refused. */

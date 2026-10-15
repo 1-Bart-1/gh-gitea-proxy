@@ -4,6 +4,7 @@ import { decodeId } from "../ids.ts";
 import { Label, User } from "./common.ts";
 import { Issue, IssueComment, PullRequest } from "./issue.ts";
 import { Repository } from "./repository.ts";
+import { search } from "./search.ts";
 
 /** The object a global node ID names, and null when it is gone. */
 export async function nodeFor(context: Context, id: string): Promise<unknown> {
@@ -77,6 +78,10 @@ export class Query {
 
   nodes({ ids }: { ids: string[] }) {
     return Promise.all(ids.map((id) => nodeFor(this.context, id)));
+  }
+
+  search(args: Parameters<typeof search>[1]) {
+    return search(this.context, args);
   }
 
   /** Gitea meters nothing, so every budget is whole. */

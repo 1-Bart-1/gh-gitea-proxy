@@ -8,7 +8,7 @@ import { Readable } from "node:stream";
 import { Gitea, GiteaError } from "./gitea.ts";
 import { answer } from "./graphql/handler.ts";
 import "./rest/index.ts";
-import { match, RestError, type RestResponse } from "./rest/router.ts";
+import { match, Reply, RestError, type RestResponse } from "./rest/router.ts";
 
 export interface Options {
   /** Gitea's base URL as the proxy reaches it, without `/api/v1`. */
@@ -52,10 +52,6 @@ function send(response: ServerResponse, status: number, body: unknown,
   response.end(text);
 }
 
-const isResponse = (value: unknown): value is RestResponse =>
-  typeof value === "object" && value !== null &&
-  ("status" in value || "body" in value || "raw" in value || "headers" in value);
-
 async function rest(options: Options, gitea: Gitea, origin: string, request: IncomingMessage,
   response: ServerResponse, url: URL): Promise<void> {
   const path = url.pathname.replace(/^\/api\/v3\/?/, "").replace(/\/$/, "");
@@ -79,7 +75,7 @@ async function rest(options: Options, gitea: Gitea, origin: string, request: Inc
     gitea, method, params: found.params, query: url.searchParams, body,
     headers: request.headers, origin,
   });
-  const shaped: RestResponse = isResponse(result) ? result : { body: result };
+  const shaped: RestResponse = result instanceof Reply ? result.response : { body: result };
   const status = shaped.status ?? (shaped.body === undefined && shaped.raw === undefined ? 204 : 200);
   if (shaped.raw !== undefined) send(response, status, shaped.raw, shaped.headers);
   else if (status === 204 || status === 304) {

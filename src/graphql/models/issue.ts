@@ -235,6 +235,10 @@ export class Issue extends Thread {
     return connection(closing.map((data) => new PullRequest(this.context, this.repo, data)), args);
   }
 
+  get subIssuesSummary() {
+    return { total: 0, completed: 0, percentCompleted: 0 };
+  }
+
   subIssues(args: Page) {
     return none(args);
   }

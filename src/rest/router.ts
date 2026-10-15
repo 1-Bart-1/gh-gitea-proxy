@@ -20,7 +20,18 @@ export interface RestResponse {
   raw?: string;
 }
 
-export type Handler = (request: RestRequest) => Promise<RestResponse | unknown>;
+/** A response with a status, headers or a raw body; a handler returns anything else as the JSON body. */
+export class Reply {
+  readonly response: RestResponse;
+
+  constructor(response: RestResponse) {
+    this.response = response;
+  }
+}
+
+export const reply = (response: RestResponse): Reply => new Reply(response);
+
+export type Handler = (request: RestRequest) => Promise<unknown>;
 
 interface Route {
   method: string;
@@ -73,7 +84,7 @@ export const registered = (): string[] =>
  * One GitHub-style page of `items`, with the `Link` header `gh --paginate`
  * follows to the next one.
  */
-export function paged<T>(request: RestRequest, path: string, items: T[]): RestResponse {
+export function paged<T>(request: RestRequest, path: string, items: T[]): Reply {
   const perPage = Math.min(Number(request.query.get("per_page") ?? 30) || 30, 100);
   const page = Math.max(Number(request.query.get("page") ?? 1) || 1, 1);
   const body = items.slice((page - 1) * perPage, page * perPage);
@@ -88,7 +99,7 @@ export function paged<T>(request: RestRequest, path: string, items: T[]): RestRe
     };
     headers.link = `${at(page + 1)}; rel="next", ${at(last)}; rel="last"`;
   }
-  return { body, headers };
+  return reply({ body, headers });
 }
 
 /** The value of a request field, from the query string or the JSON body. */

@@ -1,6 +1,6 @@
 import type { Gitea } from "../gitea.ts";
 import type { GComment, GIssue, GLabel, GReaction, GTimelineEvent } from "../types.ts";
-import { field, paged, RestError, type RestRequest, route } from "./router.ts";
+import { field, paged, reply, RestError, route, type RestRequest } from "./router.ts";
 import * as shape from "./shape.ts";
 
 const R = "repos/:owner/:repo";
@@ -30,7 +30,7 @@ route("POST", `${R}/issues`, async ({ gitea, params, body, origin }) => {
     title: body.title, body: body.body ?? "", assignees: body.assignees,
     labels: body.labels ? await labelIds(gitea, repo, body.labels) : undefined,
   });
-  return { status: 201, body: shape.issue(origin, created) };
+  return reply({ status: 201, body: shape.issue(origin, created) });
 });
 
 route("GET", `${R}/issues/:number`, async ({ gitea, params, origin }) =>
@@ -94,7 +94,7 @@ route("POST", `${R}/issues/:number/comments`, async ({ gitea, params, body, orig
   const repo = repoName(params);
   const created = await gitea.call<GComment>("POST", `repos/${repo}/issues/${params.number}/comments`,
     undefined, { body: body.body });
-  return { status: 201, body: shape.comment(origin, repo, created) };
+  return reply({ status: 201, body: shape.comment(origin, repo, created) });
 });
 
 route("GET", `${R}/issues/comments/:id`, async ({ gitea, params, origin }) =>
@@ -134,7 +134,7 @@ for (const subject of [`${R}/:kind/comments/:id`, `${R}/:kind/:number`]) {
   route("POST", `${subject}/reactions`, async ({ gitea, params, body }) => {
     const created = await gitea.call<GReaction>("POST", reactionPath(params), undefined,
       { content: body.content });
-    return { status: 201, body: shape.reaction(created) };
+    return reply({ status: 201, body: shape.reaction(created) });
   });
 
   route("DELETE", `${subject}/reactions/:reaction`, async ({ gitea, params }) => {
@@ -184,8 +184,8 @@ route("POST", `${R}/issues/:number/dependencies/blocked_by`, async ({ gitea, par
   const [owner, name] = blocker.repo.split("/");
   await gitea.call("POST", `repos/${repo}/issues/${params.number}/dependencies`, undefined,
     { owner, repo: name, index: blocker.number });
-  return { status: 201, body: shape.issue(origin,
-    await gitea.get<GIssue>(`repos/${blocker.repo}/issues/${blocker.number}`)) };
+  return reply({ status: 201, body: shape.issue(origin,
+    await gitea.get<GIssue>(`repos/${blocker.repo}/issues/${blocker.number}`)) });
 });
 
 route("DELETE", `${R}/issues/:number/dependencies/blocked_by/:id`, async ({ gitea, params }) => {

@@ -1,6 +1,6 @@
 import type { Gitea } from "../gitea.ts";
 import type { GComment, GIssue, GNotification, GUser } from "../types.ts";
-import { field, paged, route } from "./router.ts";
+import { field, paged, reply, route } from "./router.ts";
 import * as shape from "./shape.ts";
 
 /**
@@ -38,21 +38,21 @@ route("GET", "notifications", async (request) => {
   const headers: Record<string, string> = newest ? { "last-modified": new Date(newest).toUTCString() } : {};
   const since = request.headers["if-modified-since"];
   if (since && newest && Date.parse(String(since)) >= Date.parse(new Date(newest).toUTCString())) {
-    return { status: 304, headers };
+    return reply({ status: 304, headers });
   }
   const viewer = (await gitea.get<GUser>("user")).login;
   const page = paged(request, "notifications", listed);
-  const shaped = await Promise.all((page.body as GNotification[]).map(async (entry) =>
+  const shaped = await Promise.all((page.response.body as GNotification[]).map(async (entry) =>
     shape.notification(origin, entry, await reasonFor(gitea, viewer, entry))));
-  return { body: shaped, headers: { ...page.headers, ...headers } };
+  return reply({ body: shaped, headers: { ...page.response.headers, ...headers } });
 });
 
 route("PUT", "notifications", async ({ gitea, body }) => {
   await gitea.call("PUT", "notifications", { last_read_at: body.last_read_at });
-  return { status: 205, body: {} };
+  return reply({ status: 205, body: {} });
 });
 
 route("PATCH", "notifications/threads/:id", async ({ gitea, params }) => {
   await gitea.call("PATCH", `notifications/threads/${params.id}`, { "to-status": "read" });
-  return { status: 205, body: {} };
+  return reply({ status: 205, body: {} });
 });

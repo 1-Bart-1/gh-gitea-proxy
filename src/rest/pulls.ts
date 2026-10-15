@@ -1,5 +1,5 @@
 import type { GCommit, GPull, GReview, GReviewComment } from "../types.ts";
-import { field, paged, RestError, route } from "./router.ts";
+import { field, paged, reply, RestError, route } from "./router.ts";
 import * as shape from "./shape.ts";
 
 const R = "repos/:owner/:repo";
@@ -23,7 +23,7 @@ route("GET", P, async ({ gitea, params, headers, origin }) => {
   const format = accept.includes("diff") ? "diff" : accept.includes("patch") ? "patch" : undefined;
   if (format) {
     const response = await gitea.raw("GET", `${pullPath(params)}.${format}`, {}, undefined, "*/*");
-    return { raw: await response.text() };
+    return reply({ raw: await response.text() });
   }
   return shape.pull(origin, await gitea.get<GPull>(pullPath(params)));
 });
@@ -41,7 +41,7 @@ route("POST", `${R}/pulls`, async ({ gitea, params, body, origin }) => {
     title: shape.draftTitle(body.title, Boolean(body.draft)), body: body.body ?? "",
     head: body.head, base: body.base,
   });
-  return { status: 201, body: shape.pull(origin, created) };
+  return reply({ status: 201, body: shape.pull(origin, created) });
 });
 
 route("GET", `${P}/commits`, async (request) => {
@@ -131,19 +131,19 @@ route("POST", `${P}/comments/:id/replies`, async (request) => {
   });
   const [created] = await gitea.call<GReviewComment[]>("GET",
     `${pullPath(params)}/reviews/${review.id}/comments`);
-  return { status: 201, body: shape.reviewComment(origin, repoName(params), created) };
+  return reply({ status: 201, body: shape.reviewComment(origin, repoName(params), created) });
 });
 
 route("POST", `${P}/requested_reviewers`, async ({ gitea, params, body, origin }) => {
   await gitea.call("POST", `${pullPath(params)}/requested_reviewers`, undefined,
     { reviewers: body.reviewers ?? body["reviewers[]"] ?? [] });
   gitea.forget();
-  return { status: 201, body: shape.pull(origin, await gitea.get<GPull>(pullPath(params))) };
+  return reply({ status: 201, body: shape.pull(origin, await gitea.get<GPull>(pullPath(params))) });
 });
 
 route("PUT", `${P}/update-branch`, async ({ gitea, params }) => {
   await gitea.call("POST", `${pullPath(params)}/update`, { style: "merge" });
-  return { status: 202, body: { message: "Updating pull request branch." } };
+  return reply({ status: 202, body: { message: "Updating pull request branch." } });
 });
 
 route("PUT", `${P}/merge`, async ({ gitea, params, body }) => {

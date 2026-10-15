@@ -24,10 +24,11 @@ function repoOf(id: string): string {
 }
 
 /** Gitea label IDs from GitHub label node IDs. */
-const labelIds = (ids: string[] = []): number[] => ids.map((id) => Number(decodeId(id).key));
+const labelIds = (ids: string[] | null = []): number[] =>
+  (ids ?? []).map((id) => Number(decodeId(id).key));
 
 /** Gitea logins from GitHub user node IDs. */
-const logins = (ids: string[] = []): string[] => ids.map((id) => decodeId(id).key);
+const logins = (ids: string[] | null = []): string[] => (ids ?? []).map((id) => decodeId(id).key);
 
 export class Mutation {
   readonly context: Context;
